@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Posts - CRUD App{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1>Posts</h1>
+    <a href="/new" class="btn btn-primary">+ New Post</a>
+</div>
+
+{% if posts %}
+    {% for post in posts %}
+    <div class="card">
+        <h2><a href="/posts/{{ post.id }}">{{ post.title }}</a></h2>
+        <div class="meta">
+            By {{ post.author }} &middot; {{ post.created_at.strftime('%b %d, %Y') }}
+            {% if post.published %}
+                <span class="badge badge-published">Published</span>
+            {% else %}
+                <span class="badge badge-draft">Draft</span>
+            {% endif %}
+        </div>
+        <div class="content">
+            {{ post.content[:200] }}{% if post.content|length > 200 %}...{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card empty">
+        <p>No posts yet. <a href="/new">Create your first post</a>.</p>
+    </div>
+{% endif %}
+{% endblock %}
