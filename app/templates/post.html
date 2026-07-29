@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} - CRUD App{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 style="margin-bottom: 0.5rem;">{{ post.title }}</h1>
+    <div class="meta">
+        By {{ post.author }} &middot; {{ post.created_at.strftime('%b %d, %Y at %H:%M') }}
+        {% if post.published %}
+            <span class="badge badge-published">Published</span>
+        {% else %}
+            <span class="badge badge-draft">Draft</span>
+        {% endif %}
+    </div>
+    <div class="content" style="margin-top: 1rem; white-space: pre-wrap;">{{ post.content }}</div>
+    <div class="actions">
+        <a href="/posts/{{ post.id }}/edit" class="btn btn-primary">Edit</a>
+        <form action="/posts/{{ post.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Are you sure?')">
+            <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+        <a href="/" class="btn btn-secondary">Back to list</a>
+    </div>
+</div>
+{% endblock %}

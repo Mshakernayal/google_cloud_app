@@ -1,53 +1,73 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.post import Post
 from app.schemas.post import PaginatedPosts, PostCreate, PostResponse, PostUpdate
+from app.services import post_service
 
-router = APIRouter(prefix="/posts", tags=["posts"])
-
-
-@router.post("", response_model=PostResponse, status_code=201)
-def create_post(post: PostCreate, db: Session = Depends(get_db)):
-    db_post = Post(**post.model_dump())
-    db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
-    return db_post
+router = APIRouter(tags=["posts"])
+templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("", response_model=PaginatedPosts)
-def list_posts(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    posts = db.query(Post).offset(skip).limit(limit).all()
-    count = db.query(Post).count()
-    return PaginatedPosts(count=count, posts=posts)
+@router.get("/", response_class=HTMLResponse)
+def home(request: Request, db: Session = Depends(get_db)):
+    posts, _ = post_service.get_all_posts(db)
+    return templates.TemplateResponse("index.html", {"request": request, "posts": posts})
 
 
-@router.get("/{post_id}", response_model=PostResponse)
-def get_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
+@router.get("/new", response_class=HTMLResponse)
+def new_post_form(request: Request):
+    return templates.TemplateResponse("form.html", {"request": request, "post": None})
+
+
+@router.post("/new")
+def create_post_page(
+    request: Request,
+    title: str = Form(...),
+    author: str = Form(...),
+    content: str = Form(""),
+    published: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    post = post_service.create_post(db, title, author, content, published)
+    return RedirectResponse(f"/posts/{post.id}", status_code=303)
+
+
+@router.get("/posts/{post_id}", response_class=HTMLResponse)
+def view_post_page(request: Request, post_id: int, db: Session = Depends(get_db)):
+    post = post_service.get_post_by_id(db, post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    return post
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse("post.html", {"request": request, "post": post})
 
 
-@router.put("/{post_id}", response_model=PostResponse)
-def update_post(post_id: int, post_data: PostUpdate, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
+@router.get("/posts/{post_id}/edit", response_class=HTMLResponse)
+def edit_post_form(request: Request, post_id: int, db: Session = Depends(get_db)):
+    post = post_service.get_post_by_id(db, post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    for field, value in post_data.model_dump(exclude_unset=True).items():
-        setattr(post, field, value)
-    db.commit()
-    db.refresh(post)
-    return post
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse("form.html", {"request": request, "post": post})
 
 
-@router.delete("/{post_id}", status_code=204)
-def delete_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
+@router.post("/posts/{post_id}/edit")
+def update_post_page(
+    request: Request,
+    post_id: int,
+    title: str = Form(...),
+    author: str = Form(...),
+    content: str = Form(""),
+    published: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    post = post_service.update_post(db, post_id, title, author, content, published)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    db.delete(post)
-    db.commit()
+        return RedirectResponse("/", status_code=303)
+    return RedirectResponse(f"/posts/{post.id}", status_code=303)
+
+
+@router.post("/posts/{post_id}/delete")
+def delete_post_page(post_id: int, db: Session = Depends(get_db)):
+    post_service.delete_post(db, post_id)
+    return RedirectResponse("/", status_code=303)
